@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meu Dash IA — CRs Pendentes de Recebimento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#050505; --ink-2:#0D0D0D; --panel:#141414; --panel-2:#1D1D1D;
+    --paper:#111111; --paper-2:#1B1B1B;
+    --gold:#D4AF37; --gold-soft:#A6842A;
+    --green:#4C8768; --red:#B65C46;
+    --muted:#A79A73; --border:#2E2A1E; --text:#F3ECD9;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{ background:var(--ink); color:var(--text); font-family:'Inter', sans-serif; display:flex; min-height:100vh; overflow-x:hidden; }
+  ::selection{ background:var(--gold); color:var(--ink); }
+
+  .sidebar{ width:230px; flex-shrink:0; background:var(--ink-2); border-right:1px solid var(--border); padding:28px 18px; display:flex; flex-direction:column; gap:36px; }
+  .brand{ font-family:'Newsreader', serif; font-size:22px; font-weight:600; color:var(--text); }
+  .brand span{ color:var(--gold); font-style:italic; }
+  .nav{ display:flex; flex-direction:column; gap:4px; }
+  .nav-item{ padding:10px 12px; border-radius:6px; font-size:14px; color:var(--muted); cursor:pointer; display:flex; align-items:center; gap:10px; }
+  .nav-item:hover{ background:var(--panel); color:var(--text); }
+  .nav-item.active{ background:var(--panel-2); color:var(--text); border-left:2px solid var(--gold); padding-left:10px; }
+  .sidebar-footer{ margin-top:auto; font-size:12px; color:var(--muted); line-height:1.5; border-top:1px solid var(--border); padding-top:14px; }
+  .user-chip{ font-size:12px; color:var(--text); display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .user-chip .logout{ color:var(--muted); cursor:pointer; text-decoration:underline; font-size:11px; }
+
+  .main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .topbar{ display:flex; align-items:baseline; justify-content:space-between; padding:30px 40px 20px; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:12px; }
+  .topbar h1{ font-family:'Newsreader', serif; font-weight:500; font-size:27px; color:var(--text); }
+  .topbar .sub{ font-size:13px; color:var(--muted); margin-top:4px; }
+  .topbar-actions{ display:flex; gap:10px; align-items:center; }
+  .btn{ font-family:'Inter', sans-serif; font-size:13px; font-weight:500; padding:9px 16px; border-radius:6px; border:1px solid var(--border); background:var(--panel); color:var(--text); cursor:pointer; }
+  .btn:hover{ border-color:var(--gold-soft); }
+  .btn-gold{ background:var(--gold); color:var(--ink); border-color:var(--gold); font-weight:600; }
+  .btn-gold:hover{ background:#DCB661; }
+  #fileInput{ display:none; }
+
+  .content{ padding:28px 40px 60px; overflow-y:auto; }
+
+  .kpi-row{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:20px; }
+  .kpi{ background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:18px 20px; }
+  .kpi .label{ font-size:12px; color:var(--muted); margin-bottom:10px; }
+  .kpi .value{ font-family:'IBM Plex Mono', monospace; font-size:23px; font-weight:600; color:var(--text); }
+  .kpi .delta{ font-size:12px; margin-top:6px; font-family:'IBM Plex Mono', monospace; }
+  .delta.up{ color:var(--red); } .delta.down{ color:var(--green); }
+
+  .section-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
+  .section-head h2{ font-family:'Newsreader', serif; font-size:19px; font-weight:500; color:var(--text); }
+  .section-head .hint{ font-size:12px; color:var(--muted); }
+
+  .insights-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+  .insight-card{ background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:20px 22px; }
+  .rank-row{ display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:12.5px; }
+  .rank-pos{ width:16px; color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:12px; flex-shrink:0; }
+  .rank-name{ width:150px; flex-shrink:0; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rank-bar-track{ flex:1; height:7px; background:var(--panel-2); border-radius:4px; overflow:hidden; }
+  .rank-bar-fill{ height:100%; background:var(--gold); border-radius:4px; }
+  .rank-value{ width:84px; text-align:right; font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--muted); flex-shrink:0; }
+
+  .alert-item{ display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:12.5px; line-height:1.5; }
+  .alert-item:last-child{ border-bottom:none; }
+  .alert-dot{ width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .alert-dot.high{ background:var(--red); } .alert-dot.mid{ background:var(--gold); }
+  .alert-item b{ color:var(--text); }
+  .alert-empty{ font-size:12.5px; color:var(--muted); }
+
+  .cat-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .cat-row:last-child{ border-bottom:none; }
+  .cat-name{ color:var(--text); } .cat-value{ font-family:'IBM Plex Mono', monospace; color:var(--gold); font-size:12.5px; }
+
+  .var-stat{ display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .var-stat:last-child{ border-bottom:none; }
+  .var-stat .n{ font-family:'IBM Plex Mono', monospace; font-size:14px; font-weight:600; }
+  .var-stat .n.up{ color:var(--red); } .var-stat .n.down{ color:var(--green); } .var-stat .n.flat{ color:var(--muted); }
+
+  .table-wrap{ background:var(--paper); border-radius:8px; overflow:hidden; margin-bottom:34px; }
+  .table-controls{ display:flex; gap:10px; padding:14px 18px; border-bottom:1px solid var(--paper-2); background:var(--paper); flex-wrap:wrap; }
+  .table-controls input, .table-controls select{ font-family:'Inter', sans-serif; font-size:13px; padding:8px 12px; border-radius:5px; border:1px solid var(--paper-2); background:#fff; color:var(--ink); }
+  .table-controls input{ flex:1; max-width:260px; }
+  table{ width:100%; border-collapse:collapse; font-family:'IBM Plex Mono', monospace; font-size:12px; }
+  thead th{ text-align:right; padding:10px 12px; color:var(--ink-2); font-weight:600; border-bottom:1px solid var(--paper-2); background:var(--paper-2); white-space:nowrap; }
+  thead th:nth-child(-n+3){ text-align:left; font-family:'Inter', sans-serif; }
+  tbody td{ padding:9px 12px; text-align:right; color:#3B3020; border-bottom:1px solid #E7DDC4; white-space:nowrap; }
+  tbody td:nth-child(-n+3){ text-align:left; font-family:'Inter', sans-serif; white-space:normal; }
+  tbody tr:hover{ background:#EFE6CC; }
+  .badge{ display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .badge.pend{ background:rgba(201,162,75,.18); color:var(--gold-soft); }
+  .badge.venc{ background:rgba(182,92,70,.15); color:var(--red); }
+  .badge.pago{ background:rgba(76,135,104,.15); color:var(--green); }
+
+  .chat-toggle{ position:fixed; right:28px; bottom:28px; width:54px; height:54px; border-radius:50%; background:var(--gold); color:var(--ink); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; border:none; box-shadow:0 6px 20px rgba(0,0,0,.35); z-index:50; }
+  .chat-drawer{ position:fixed; top:0; right:-420px; width:400px; height:100vh; background:var(--ink-2); border-left:1px solid var(--border); display:flex; flex-direction:column; transition:right .25s ease; z-index:60; }
+  .chat-drawer.open{ right:0; }
+  .chat-head{ padding:22px 22px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline; }
+  .chat-head h3{ font-family:'Newsreader', serif; font-size:18px; color:var(--text); font-weight:500; }
+  .chat-head .close{ cursor:pointer; color:var(--muted); font-size:20px; background:none; border:none; }
+  .chat-body{ flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:14px; }
+  .msg{ font-size:13.5px; line-height:1.55; max-width:92%; white-space:pre-wrap; }
+  .msg.user{ align-self:flex-end; background:var(--panel-2); padding:10px 14px; border-radius:10px 10px 2px 10px; color:var(--text); }
+  .msg.ai{ align-self:flex-start; background:var(--panel); padding:10px 14px; border-radius:10px 10px 10px 2px; color:var(--text); border:1px solid var(--border); }
+  .msg.ai.loading{ color:var(--muted); font-style:italic; }
+  .chat-suggestions{ display:flex; flex-wrap:wrap; gap:6px; padding:0 20px 12px; }
+  .sugg{ font-size:11.5px; padding:6px 10px; border-radius:20px; border:1px solid var(--border); color:var(--muted); cursor:pointer; background:var(--panel); }
+  .sugg:hover{ border-color:var(--gold-soft); color:var(--text); }
+  .chat-input-row{ display:flex; gap:8px; padding:16px 20px; border-top:1px solid var(--border); }
+  .chat-input-row textarea{ flex:1; resize:none; height:44px; border-radius:8px; border:1px solid var(--border); background:var(--panel); color:var(--text); padding:11px 12px; font-family:'Inter', sans-serif; font-size:13px; }
+  .chat-input-row textarea:focus{ outline:none; border-color:var(--gold-soft); }
+  .send-btn{ width:44px; height:44px; border-radius:8px; border:none; background:var(--gold); color:var(--ink); cursor:pointer; font-size:16px; }
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:55; display:none; }
+  .overlay.open{ display:block; }
+
+  #authScreen{ position:fixed; inset:0; z-index:100; background:var(--ink); display:flex; align-items:center; justify-content:center; background-image: radial-gradient(circle at 20% 20%, rgba(201,162,75,0.08), transparent 45%); }
+  .auth-card{ width:380px; max-width:90vw; background:var(--ink-2); border:1px solid var(--border); border-radius:10px; padding:36px 34px; }
+  .auth-brand{ font-family:'Newsreader', serif; font-size:24px; font-weight:600; color:var(--text); margin-bottom:6px; }
+  .auth-brand span{ color:var(--gold); font-style:italic; }
+  .auth-sub{ font-size:13px; color:var(--muted); margin-bottom:26px; }
+  .auth-tabs{ display:flex; border:1px solid var(--border); border-radius:7px; overflow:hidden; margin-bottom:22px; }
+  .auth-tab{ flex:1; text-align:center; padding:9px 0; font-size:13px; color:var(--muted); cursor:pointer; background:var(--panel); }
+  .auth-tab.active{ background:var(--panel-2); color:var(--text); font-weight:600; }
+  .auth-field{ margin-bottom:14px; }
+  .auth-field label{ display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .auth-field input{ width:100%; padding:10px 12px; border-radius:6px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-family:'Inter', sans-serif; font-size:13.5px; }
+  .auth-field input:focus{ outline:none; border-color:var(--gold-soft); }
+  .auth-error{ font-size:12.5px; color:var(--red); margin:-4px 0 12px; min-height:1px; }
+  .auth-submit{ width:100%; padding:11px 0; border-radius:6px; border:none; background:var(--gold); color:var(--ink); font-weight:600; font-size:13.5px; cursor:pointer; margin-top:4px; }
+  .auth-submit:hover{ background:#DCB661; }
+  .auth-note{ font-size:11.5px; color:var(--muted); margin-top:18px; line-height:1.5; border-top:1px solid var(--border); padding-top:14px; }
+  #app{ display:none; }
+
+  .modal-overlay{ position:fixed; inset:0; z-index:120; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; }
+  .modal-overlay.open{ display:flex; }
+  .modal-card{ width:520px; max-width:92vw; max-height:80vh; overflow-y:auto; background:var(--ink-2); border:1px solid var(--border); border-radius:10px; padding:26px 28px; }
+  .modal-card h3{ font-family:'Newsreader', serif; font-size:19px; color:var(--text); font-weight:500; margin-bottom:10px; }
+  .modal-card p{ font-size:13px; color:var(--text); line-height:1.6; margin-bottom:10px; }
+  .modal-card .modal-muted{ color:var(--muted); font-size:12.5px; }
+  .modal-cols{ font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--muted); background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:10px 12px; margin:10px 0 16px; line-height:1.6; word-break:break-word; }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:6px; }
+
+  @media (max-width: 900px){
+    .sidebar{ display:none; }
+    .kpi-row{ grid-template-columns:repeat(2,1fr); }
+    .insights-row{ grid-template-columns:1fr; }
+    #totaisPorRevenda{ grid-template-columns:1fr !important; }
+    .chat-drawer{ width:100%; right:-100%; }
+    .topbar, .content{ padding-left:20px; padding-right:20px; }
+  }
+
+  @media print{
+    body{ background:#fff; color:#000; display:block; }
+    .sidebar, .topbar-actions, .chat-toggle, .chat-drawer, .overlay, .modal-overlay, #authScreen, .table-controls{ display:none !important; }
+    .main{ display:block; }
+    .content{ padding:0; overflow:visible; }
+    .view-block[data-hidden-print]{ display:none !important; }
+    .kpi, .insight-card, .table-wrap{ background:#fff !important; border:1px solid #999 !important; break-inside:avoid; }
+    .kpi .label, .kpi .value, .kpi .delta, .section-head h2, .cat-name, .rank-name, .var-stat span, .alert-item, .brand{ color:#000 !important; }
+    table, thead th, tbody td{ color:#000 !important; background:#fff !important; }
+    thead th{ background:#eee !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-brand">Meu Dash <span>IA</span></div>
+    <div class="auth-sub">Gestão de CRs pendentes de recebimento — Mercado Pago.</div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Entrar</div>
+      <div class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Criar conta</div>
+    </div>
+    <div id="loginForm">
+      <div class="auth-field"><label>E-mail</label><input type="email" id="loginEmail" placeholder="voce@empresa.com"></div>
+      <div class="auth-field"><label>Senha</label><input type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin();"></div>
+      <div class="auth-error" id="loginError"></div>
+      <button class="auth-submit" onclick="doLogin()">Entrar</button>
+    </div>
+    <div id="signupForm" style="display:none;">
+      <div class="auth-field"><label>Nome</label><input type="text" id="signupName" placeholder="Seu nome"></div>
+      <div class="auth-field"><label>E-mail</label><input type="email" id="signupEmail" placeholder="voce@empresa.com"></div>
+      <div class="auth-field"><label>Senha</label><input type="password" id="signupPassword" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter')doSignup();"></div>
+      <div class="auth-error" id="signupError"></div>
+      <button class="auth-submit" onclick="doSignup()">Criar conta</button>
+    </div>
+    <div class="auth-note">
+      Protótipo: login simulado apenas no navegador (sem servidor) — as contas somem ao recarregar.
+      <div style="margin-top:12px;"><span class="logout" style="cursor:pointer; text-decoration:underline;" onclick="enterAsGuest()">Pular login e testar agora →</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+<div class="sidebar">
+  <div class="brand">Meu Dash <span>IA</span></div>
+  <div class="nav">
+    <div class="nav-item active" id="navDashboard" onclick="setView('dashboard')">📊 &nbsp;Dashboard</div>
+    <div class="nav-item" id="navRevendas" onclick="setView('revendas')">🏬 &nbsp;Revendas</div>
+    <div class="nav-item" id="navVencidos" onclick="setView('vencidos')">⏱ &nbsp;Vencidos</div>
+    <div class="nav-item" id="navHistorico" onclick="setView('historico')">🗂 &nbsp;Histórico</div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-chip"><span id="userChipName">—</span><span class="logout" onclick="doLogout()">Sair</span></div>
+    Protótipo funcional.<br>
+    Dados de exemplo no formato do relatório de CRs do Mercado Pago. Importe sua planilha real (.xls/.xlsx, todas as revendas) para substituir.
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1>CRs Pendentes de Recebimento</h1>
+      <div class="sub" id="fileMeta">Dados de exemplo · todas as revendas — Mercado Pago</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" onclick="document.getElementById('fileInput').click()">Importar planilha</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleUpload(event)">
+      <button class="btn" onclick="openReportModal()">Emitir relatório</button>
+      <button class="btn btn-gold" onclick="openChat()">Perguntar à IA</button>
+    </div>
+  </div>
+
+  <div class="content" id="printArea">
+    <div class="view-block" data-views="dashboard">
+      <div class="kpi-row" id="kpiRow"></div>
+    </div>
+
+    <div class="view-block" data-views="dashboard">
+      <div class="insights-row">
+        <div class="insight-card">
+          <div class="section-head" style="margin-bottom:10px;"><h2>Ranking — revenda com mais pendências</h2><span class="hint">Valor pendente</span></div>
+          <div id="rankingList"></div>
+        </div>
+        <div class="insight-card">
+          <div class="section-head" style="margin-bottom:10px;"><h2>Alertas e inconsistências</h2><span class="hint" id="alertCount"></span></div>
+          <div id="alertsList"></div>
+        </div>
+      </div>
+
+      <div class="insights-row">
+        <div class="insight-card">
+          <div class="section-head" style="margin-bottom:10px;"><h2>Por situação</h2><span class="hint">Quantidade e valor</span></div>
+          <div id="categoryList"></div>
+        </div>
+        <div class="insight-card">
+          <div class="section-head" style="margin-bottom:10px;"><h2>Resumo geral</h2><span class="hint">Todos os títulos</span></div>
+          <div id="variationSummary"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="view-block" data-views="dashboard revendas">
+      <div class="section-head"><h2>Totais por revenda</h2><span class="hint">Tarifas, despesas e valor líquido de cada revenda</span></div>
+      <div id="totaisPorRevenda" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; margin-bottom:34px;"></div>
+    </div>
+
+    <div class="view-block" data-views="dashboard">
+      <div class="section-head"><h2>Totais consolidados — todas as revendas</h2><span class="hint">Soma de todas as revendas juntas</span></div>
+      <div class="kpi-row" id="totaisCardsRow" style="margin-bottom:34px;"></div>
+    </div>
+
+    <div class="view-block" data-views="dashboard revendas">
+      <div class="section-head"><h2>Comparativo em tabela</h2><span class="hint" id="demonstrativoNote"></span></div>
+      <div class="table-wrap">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>Revenda</th><th>Valor Bruto</th><th>Tarifa Venda</th><th>Tarifa Envio</th><th>Total Despesas</th><th>Frete Comprador</th><th>Descontos e Bônus</th><th>Valor Líquido</th>
+            </tr></thead>
+            <tbody id="demonstrativoBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="view-block" data-views="dashboard revendas vencidos">
+      <div class="section-head"><h2 id="titulosHeading">Títulos</h2><span class="hint">Clique numa linha para perguntar à IA sobre ela</span></div>
+      <div class="table-wrap">
+        <div class="table-controls">
+          <input type="text" id="searchBox" placeholder="Buscar cliente, título ou revenda..." oninput="renderTable()">
+          <select id="revendaFilter" onchange="renderTable()"><option value="">Todas as revendas</option></select>
+          <select id="statusFilter" onchange="renderTable()">
+            <option value="">Todas as situações</option>
+            <option value="vencido">Vencidos</option>
+            <option value="pendente">Pendentes (não vencidos)</option>
+            <option value="pago">Recebidos</option>
+          </select>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>Revenda</th><th>Cliente</th><th>Título</th><th>Sit.</th><th>Valor</th><th>Vencimento</th><th>Pagamento</th><th>Dias atraso</th><th>Vlr. Líquido</th><th>Status</th>
+            </tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="view-block" data-views="historico">
+      <div class="section-head"><h2>Histórico de importações</h2><span class="hint">Registrado nesta sessão do navegador</span></div>
+      <div class="table-wrap">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Data/hora</th><th>Arquivo</th><th>Revendas</th><th>Títulos importados</th></tr></thead>
+            <tbody id="historicoBody"><tr><td colspan="4" style="text-align:left; padding:16px; color:#7A6E52;">Nenhuma importação registrada nesta sessão ainda — os dados exibidos são o exemplo inicial.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeChat()"></div>
+<button class="chat-toggle" onclick="openChat()" title="Perguntar à IA">💬</button>
+<div class="chat-drawer" id="chatDrawer">
+  <div class="chat-head"><h3>Assistente de dados</h3><button class="close" onclick="closeChat()">✕</button></div>
+  <div class="chat-body" id="chatBody">
+    <div class="msg ai">Olá. Posso responder sobre os CRs pendentes de recebimento — por revenda, por cliente, atrasos, valores líquidos. Eu só respondo com base nos dados reais carregados.</div>
+  </div>
+  <div class="chat-suggestions">
+    <div class="sugg" onclick="askSuggested(this)">Qual revenda tem mais valor pendente?</div>
+    <div class="sugg" onclick="askSuggested(this)">Quais títulos estão vencidos há mais tempo?</div>
+    <div class="sugg" onclick="askSuggested(this)">Há inconsistências nos dados?</div>
+  </div>
+  <div class="chat-input-row">
+    <textarea id="chatInput" placeholder="Pergunte sobre os CRs..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+    <button class="send-btn" onclick="sendMessage()">➤</button>
+  </div>
+</div>
+</div><!-- /#app -->
+
+<div class="modal-overlay" id="importModal" onclick="if(event.target===this) closeImportModal()">
+  <div class="modal-card" id="importModalBody"></div>
+</div>
+
+<script>
+// ---- Autenticação (simulada em memória — sem backend) ----
+let USERS = [{ name:'Usuária Demo', email:'demo@meudash.ia', password:'demo123' }];
+let currentUser = null;
+
+function switchAuthTab(tab){
+  const isLogin = tab === 'login';
+  document.getElementById('tabLogin').classList.toggle('active', isLogin);
+  document.getElementById('tabSignup').classList.toggle('active', !isLogin);
+  document.getElementById('loginForm').style.display = isLogin ? 'block' : 'none';
+  document.getElementById('signupForm').style.display = isLogin ? 'none' : 'block';
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('signupError').textContent = '';
+}
+function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  if(!email || !password){ errEl.textContent = 'Preencha e-mail e senha.'; return; }
+  const user = USERS.find(u => u.email === email);
+  if(!user){ errEl.textContent = 'Não encontramos essa conta. Crie uma em "Criar conta".'; return; }
+  if(user.password !== password){ errEl.textContent = 'Senha incorreta.'; return; }
+  errEl.textContent = ''; enterApp(user);
+}
+function doSignup(){
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+  const password = document.getElementById('signupPassword').value;
+  const errEl = document.getElementById('signupError');
+  if(!name || !email || !password){ errEl.textContent = 'Preencha todos os campos.'; return; }
+  if(password.length < 6){ errEl.textContent = 'A senha deve ter pelo menos 6 caracteres.'; return; }
+  if(USERS.some(u => u.email === email)){ errEl.textContent = 'Já existe uma conta com esse e-mail. Faça login.'; return; }
+  errEl.textContent = '';
+  const user = { name, email, password }; USERS.push(user); enterApp(user);
+}
+function enterApp(user){
+  currentUser = user;
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('userChipName').textContent = user.name || user.email;
+}
+function enterAsGuest(){ enterApp({ name:'Visitante (sem login)', email:'guest@local' }); }
+function doLogout(){
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('loginEmail').value = ''; document.getElementById('loginPassword').value = '';
+}
+
+// ---- Dados ----
+// Estrutura de cada título (linha): revenda, cliente, codCliente, titulo, situacao,
+// valor, saldo, emissao, vencimento, pagamento, tarifaVenda, tarifaEnvio, despesaTotal,
+// freteComprador, descontosBonus, valorLiquido, vendaCancelada, solucao
+let DATA = [
+  { revenda:'Revenda Diesel Cuiabá', cliente:'Cliente A. Ricardo', codCliente:'1983845', titulo:'253889', situacao:'01', valor:95.98, saldo:0, emissao:'16/12/2025', vencimento:'17/12/2025', pagamento:'22/01/2026', tarifaVenda:0, tarifaEnvio:0, despesaTotal:0, freteComprador:0, descontosBonus:0, valorLiquido:95.98, vendaCancelada:'', solucao:'' },
+  { revenda:'Revenda Diesel Cuiabá', cliente:'Cliente D. Correa', codCliente:'1984077', titulo:'253933', situacao:'EM', valor:526.54, saldo:526.54, emissao:'18/12/2025', vencimento:'19/01/2026', pagamento:'', tarifaVenda:0, tarifaEnvio:0, despesaTotal:0, freteComprador:0, descontosBonus:0, valorLiquido:526.54, vendaCancelada:'', solucao:'' },
+  { revenda:'Revenda Fiat Pará - BR', cliente:'Cliente R. Angella', codCliente:'2025023', titulo:'138248', situacao:'PT', valor:298.89, saldo:0, emissao:'05/08/2026', vencimento:'06/08/2026', pagamento:'24/08/2026', tarifaVenda:35.87, tarifaEnvio:16.53, despesaTotal:52.40, freteComprador:5.99, descontosBonus:0, valorLiquido:240.57, vendaCancelada:'', solucao:'Peça devolvida com reembolso para o comprador' },
+  { revenda:'Revenda Fiat Pará - BR', cliente:'Cliente R. Lima Neto', codCliente:'1049701', titulo:'140419', situacao:'EM', valor:415.94, saldo:415.94, emissao:'23/10/2026', vencimento:'24/11/2026', pagamento:'', tarifaVenda:49.91, tarifaEnvio:24.45, despesaTotal:74.36, freteComprador:0, descontosBonus:0, valorLiquido:321.58, vendaCancelada:'', solucao:'' },
+  { revenda:'Revenda Fiat Centro Oeste', cliente:'Cliente C. Puti', codCliente:'2012174', titulo:'121988', situacao:'PT', valor:2248.45, saldo:0, emissao:'28/05/2026', vencimento:'31/07/2026', pagamento:'18/02/2026', tarifaVenda:269.81, tarifaEnvio:0, despesaTotal:269.81, freteComprador:0, descontosBonus:0, valorLiquido:1978.64, vendaCancelada:'sim', solucao:'Venda cancelada pelo comprador pela demora da entrega' },
+  { revenda:'Revenda Fiat Centro Oeste', cliente:'Cliente J. Mondego', codCliente:'2056557', titulo:'125479', situacao:'EM', valor:667.76, saldo:667.76, emissao:'13/01/2026', vencimento:'12/02/2026', pagamento:'', tarifaVenda:0, tarifaEnvio:0, despesaTotal:0, freteComprador:0, descontosBonus:0, valorLiquido:667.76, vendaCancelada:'', solucao:'Peça entregue e recebida pelo cliente em 09/02/2026' },
+  { revenda:'Revenda Mônaco Peças', cliente:'Cliente J. F. Santos', codCliente:'2023729', titulo:'22', situacao:'PT', valor:599.00, saldo:0, emissao:'30/07/2026', vencimento:'31/07/2026', pagamento:'25/08/2026', tarifaVenda:71.88, tarifaEnvio:0, despesaTotal:71.88, freteComprador:0, descontosBonus:0, valorLiquido:527.12, vendaCancelada:'', solucao:'' },
+  { revenda:'Revenda Mônaco Peças', cliente:'Cliente M. Pinto', codCliente:'2038148', titulo:'44', situacao:'EM', valor:2589.90, saldo:2589.90, emissao:'10/10/2026', vencimento:'11/10/2026', pagamento:'', tarifaVenda:440.28, tarifaEnvio:0, despesaTotal:440.28, freteComprador:100.99, descontosBonus:0, valorLiquido:2105.17, vendaCancelada:'sim', solucao:'Cancelada porque o comprador se arrependeu' },
+  { revenda:'Revenda Jeep RAM', cliente:'Cliente B. Godoy', codCliente:'2101127', titulo:'853', situacao:'PT', valor:4449.00, saldo:0, emissao:'06/08/2026', vencimento:'07/09/2026', pagamento:'25/08/2026', tarifaVenda:0, tarifaEnvio:0, despesaTotal:0, freteComprador:240.99, descontosBonus:0, valorLiquido:3809.17, vendaCancelada:'', solucao:'Chega entre os dias 18 e 21 de agosto' },
+];
+
+const REQUIRED_COLS = ['Revenda (aba da planilha)','Nome/Cliente','Título','Sit','Valor','Saldo','Emissão','Vencimento','Pagamento','Tarifa de Venda','Tarifa/Envio','Total Despesa(s)','Frete pago Comprador','Descontos e Bônus','Valor Líquido'];
+
+function fmt(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.', ','); }
+function parseBR(dateStr){
+  if(!dateStr) return null;
+  const p = String(dateStr).split('/');
+  if(p.length !== 3) return null;
+  return new Date(Number(p[2]), Number(p[1])-1, Number(p[0]));
+}
+function today(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+function isPendente(r){
+  const sit = String(r.situacao||'').trim().toUpperCase();
+  if(sit === 'PT') return false; // "PT" = Pago Total na planilha: nunca conta como pendente/em aberto
+  return !r.pagamento || Number(r.saldo) > 0;
+}
+function isVencido(r){
+  if(!isPendente(r)) return false;
+  const v = parseBR(r.vencimento);
+  return v && v < today();
+}
+function diasAtraso(r){
+  const v = parseBR(r.vencimento);
+  if(!v) return 0;
+  const diff = Math.floor((today() - v) / 86400000);
+  return diff > 0 ? diff : 0;
+}
+function statusOf(r){ if(!isPendente(r)) return 'pago'; return isVencido(r) ? 'vencido' : 'pendente'; }
+function pendingValue(r){ return isPendente(r) ? (Number(r.saldo) > 0 ? Number(r.saldo) : Number(r.valor)) : 0; }
+
+function populateRevendaFilter(){
+  const sel = document.getElementById('revendaFilter');
+  const current = sel.value;
+  const revendas = [...new Set(DATA.map(r=>r.revenda))].sort();
+  sel.innerHTML = '<option value="">Todas as revendas</option>' + revendas.map(r=>`<option value="${r}">${r}</option>`).join('');
+  if(revendas.includes(current)) sel.value = current;
+}
+
+function renderKPIs(){
+  const revendas = [...new Set(DATA.map(r=>r.revenda))];
+  const pendentes = DATA.filter(isPendente);
+  const vencidos = DATA.filter(isVencido);
+  const totalPendente = pendentes.reduce((s,r)=>s+pendingValue(r),0);
+  const totalVencido = vencidos.reduce((s,r)=>s+pendingValue(r),0);
+  const maiorAtraso = vencidos.reduce((m,r)=>Math.max(m,diasAtraso(r)),0);
+  const tarifas = DATA.filter(r=>r.valor>0).map(r=>r.tarifaVenda/r.valor*100);
+  const tarifaMedia = tarifas.length ? tarifas.reduce((a,b)=>a+b,0)/tarifas.length : 0;
+  let maiorCliente = pendentes.reduce((m,r)=> pendingValue(r) > pendingValue(m||{}) ? r : m, null);
+
+  const kpis = [
+    { label:'Revendas monitoradas', value: revendas.length, delta: revendas.slice(0,3).join(', ') + (revendas.length>3?'…':'') },
+    { label:'Títulos pendentes', value: pendentes.length, delta: `de ${DATA.length} títulos` },
+    { label:'Valor total pendente', value: fmt(totalPendente), delta: `${pendentes.length} títulos em aberto`, cls:'up' },
+    { label:'Títulos vencidos', value: vencidos.length, delta: fmt(totalVencido) + ' em atraso', cls:'up' },
+    { label:'Maior atraso', value: maiorAtraso + ' dias', delta: vencidos.length ? 'entre os títulos vencidos' : 'nenhum título vencido' },
+    { label:'Tarifa média Mercado Pago', value: tarifaMedia.toFixed(1)+'%', delta: 'sobre o valor bruto das vendas' },
+    { label:'Cliente com maior pendência', value: maiorCliente ? fmt(pendingValue(maiorCliente)) : '—', delta: maiorCliente ? (maiorCliente.cliente + ' · ' + maiorCliente.revenda) : '' },
+    { label:'Total de títulos na base', value: DATA.length, delta: `${DATA.length - pendentes.length} já recebidos` },
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k => `
+    <div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="delta ${k.cls||''}">${k.delta||''}</div></div>
+  `).join('');
+}
+
+function pendingByRevenda(){
+  const revendas = [...new Set(DATA.map(r=>r.revenda))];
+  return revendas.map(rv => ({ revenda:rv, total: DATA.filter(r=>r.revenda===rv && isPendente(r)).reduce((s,r)=>s+pendingValue(r),0) }));
+}
+
+function renderRanking(){
+  const list = pendingByRevenda().sort((a,b)=>b.total-a.total);
+  const max = Math.max(...list.map(a=>a.total), 1);
+  document.getElementById('rankingList').innerHTML = list.map((a,i) => `
+    <div class="rank-row">
+      <span class="rank-pos">${i+1}</span>
+      <span class="rank-name" title="${a.revenda}">${a.revenda}</span>
+      <span class="rank-bar-track"><span class="rank-bar-fill" style="width:${(a.total/max*100).toFixed(0)}%"></span></span>
+      <span class="rank-value">${fmt(a.total)}</span>
+    </div>`).join('');
+}
+
+function renderCategoryBreakdown(){
+  const groups = {};
+  DATA.forEach(r => { const st = statusOf(r); groups[st] = groups[st] || { count:0, total:0 }; groups[st].count++; groups[st].total += pendingValue(r) || r.valor; });
+  const labelMap = { pendente:'Pendente (não vencido)', vencido:'Vencido', pago:'Recebido' };
+  document.getElementById('categoryList').innerHTML = Object.keys(groups).map(k => `
+    <div class="cat-row"><span class="cat-name">${labelMap[k]||k} (${groups[k].count})</span><span class="cat-value">${fmt(groups[k].total)}</span></div>
+  `).join('');
+}
+
+function renderVariationSummary(){
+  const totalValor = DATA.reduce((s,r)=>s+Number(r.valor),0);
+  const totalLiquido = DATA.reduce((s,r)=>s+Number(r.valorLiquido||0),0);
+  const totalTarifas = DATA.reduce((s,r)=>s+Number(r.tarifaVenda||0)+Number(r.tarifaEnvio||0),0);
+  const canceladas = DATA.filter(r => String(r.vendaCancelada).toLowerCase().includes('sim')).length;
+  const stats = [
+    { label:'Valor bruto total das vendas', value: fmt(totalValor), cls:'flat' },
+    { label:'Valor líquido total (após despesas)', value: fmt(totalLiquido), cls:'down' },
+    { label:'Total pago em tarifas (venda + envio)', value: fmt(totalTarifas), cls:'up' },
+    { label:'Vendas marcadas como canceladas', value: canceladas, cls:'flat' },
+  ];
+  document.getElementById('variationSummary').innerHTML = stats.map(s => `<div class="var-stat"><span>${s.label}</span><span class="n ${s.cls}">${s.value}</span></div>`).join('');
+}
+
+function renderTotaisPorRevenda(){
+  const revendas = [...new Set(DATA.map(r=>r.revenda))].sort();
+  const html = revendas.map(rv => {
+    const rows = DATA.filter(r => r.revenda === rv);
+    const t = {
+      valor: rows.reduce((s,r)=>s+Number(r.valor),0),
+      tarifaVenda: rows.reduce((s,r)=>s+Number(r.tarifaVenda||0),0),
+      tarifaEnvio: rows.reduce((s,r)=>s+Number(r.tarifaEnvio||0),0),
+      despesaTotal: rows.reduce((s,r)=>s+Number(r.despesaTotal||0),0),
+      freteComprador: rows.reduce((s,r)=>s+Number(r.freteComprador||0),0),
+      descontosBonus: rows.reduce((s,r)=>s+Number(r.descontosBonus||0),0),
+      valorLiquido: rows.reduce((s,r)=>s+Number(r.valorLiquido||0),0),
+    };
+    return `
+      <div class="insight-card">
+        <div class="section-head" style="margin-bottom:8px;"><h2 style="font-size:16px;">${rv}</h2><span class="hint">${rows.length} títulos</span></div>
+        <div class="var-stat"><span>Valor Bruto</span><span class="n flat">${fmt(t.valor)}</span></div>
+        <div class="var-stat"><span>Tarifa Venda</span><span class="n up">${fmt(t.tarifaVenda)}</span></div>
+        <div class="var-stat"><span>Tarifa Envio</span><span class="n up">${fmt(t.tarifaEnvio)}</span></div>
+        <div class="var-stat"><span>Total Despesas</span><span class="n up">${fmt(t.despesaTotal)}</span></div>
+        <div class="var-stat"><span>Frete pago Comprador</span><span class="n flat">${fmt(t.freteComprador)}</span></div>
+        <div class="var-stat"><span>Descontos e Bônus</span><span class="n flat">${fmt(t.descontosBonus)}</span></div>
+        <div class="var-stat"><span>Valor Líquido</span><span class="n down">${fmt(t.valorLiquido)}</span></div>
+      </div>`;
+  }).join('');
+  document.getElementById('totaisPorRevenda').innerHTML = html;
+}
+
+function renderTotaisCards(){
+  const totalValor = DATA.reduce((s,r)=>s+Number(r.valor),0);
+  const totalTarifaVenda = DATA.reduce((s,r)=>s+Number(r.tarifaVenda||0),0);
+  const totalTarifaEnvio = DATA.reduce((s,r)=>s+Number(r.tarifaEnvio||0),0);
+  const totalDespesa = DATA.reduce((s,r)=>s+Number(r.despesaTotal||0),0);
+  const totalFrete = DATA.reduce((s,r)=>s+Number(r.freteComprador||0),0);
+  const totalDesconto = DATA.reduce((s,r)=>s+Number(r.descontosBonus||0),0);
+  const totalLiquido = DATA.reduce((s,r)=>s+Number(r.valorLiquido||0),0);
+  const pct = (v) => totalValor > 0 ? (v/totalValor*100).toFixed(1)+'% do valor bruto' : '';
+
+  const cards = [
+    { label:'Tarifa Venda 12 a 17%', value: fmt(totalTarifaVenda), delta: pct(totalTarifaVenda), cls:'up' },
+    { label:'Tarifa Envio', value: fmt(totalTarifaEnvio), delta: pct(totalTarifaEnvio), cls:'up' },
+    { label:'Total Despesas', value: fmt(totalDespesa), delta: pct(totalDespesa), cls:'up' },
+    { label:'Frete pago Comprador', value: fmt(totalFrete), delta: pct(totalFrete) },
+    { label:'Descontos e Bônus', value: fmt(totalDesconto), delta: pct(totalDesconto) },
+    { label:'Valor Líquido', value: fmt(totalLiquido), delta: pct(totalLiquido), cls:'down' },
+  ];
+  document.getElementById('totaisCardsRow').innerHTML = cards.map(k => `
+    <div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="delta ${k.cls||''}">${k.delta||''}</div></div>
+  `).join('');
+}
+
+function renderDemonstrativo(){
+  const revendas = [...new Set(DATA.map(r=>r.revenda))].sort();
+  const linhas = revendas.map(rv => {
+    const rows = DATA.filter(r => r.revenda === rv);
+    return {
+      revenda: rv,
+      valor: rows.reduce((s,r)=>s+Number(r.valor),0),
+      tarifaVenda: rows.reduce((s,r)=>s+Number(r.tarifaVenda||0),0),
+      tarifaEnvio: rows.reduce((s,r)=>s+Number(r.tarifaEnvio||0),0),
+      despesaTotal: rows.reduce((s,r)=>s+Number(r.despesaTotal||0),0),
+      freteComprador: rows.reduce((s,r)=>s+Number(r.freteComprador||0),0),
+      descontosBonus: rows.reduce((s,r)=>s+Number(r.descontosBonus||0),0),
+      valorLiquido: rows.reduce((s,r)=>s+Number(r.valorLiquido||0),0),
+    };
+  });
+  const totalRow = linhas.reduce((acc,l) => {
+    ['valor','tarifaVenda','tarifaEnvio','despesaTotal','freteComprador','descontosBonus','valorLiquido'].forEach(k => acc[k] = (acc[k]||0) + l[k]);
+    return acc;
+  }, { revenda:'TOTAL CONSOLIDADO' });
+
+  const rowHtml = (l, isTotal) => `
+    <tr${isTotal ? ' style="font-weight:600; border-top:2px solid #C9A24B;"' : ''}>
+      <td>${l.revenda}</td>
+      <td>${fmt(l.valor)}</td>
+      <td>${fmt(l.tarifaVenda)}</td>
+      <td>${fmt(l.tarifaEnvio)}</td>
+      <td>${fmt(l.despesaTotal)}</td>
+      <td>${fmt(l.freteComprador)}</td>
+      <td>${fmt(l.descontosBonus)}</td>
+      <td>${fmt(l.valorLiquido)}</td>
+    </tr>`;
+
+  document.getElementById('demonstrativoBody').innerHTML = linhas.map(l=>rowHtml(l,false)).join('') + rowHtml(totalRow, true);
+
+  // checagem de consistência: Valor - despesas deveria bater aproximadamente com Valor Líquido
+  const calc = totalRow.valor - totalRow.tarifaVenda - totalRow.tarifaEnvio - totalRow.freteComprador - totalRow.descontosBonus;
+  const diff = Math.abs(calc - totalRow.valorLiquido);
+  const noteEl = document.getElementById('demonstrativoNote');
+  if(diff > 1){
+    noteEl.textContent = `Atenção: Valor bruto − despesas informadas (${fmt(calc)}) difere do Valor Líquido somado na planilha (${fmt(totalRow.valorLiquido)}) em ${fmt(diff)}. Pode haver despesas não mapeadas nesta versão ou lançamentos incompletos.`;
+    noteEl.style.color = 'var(--red)';
+  } else {
+    noteEl.textContent = 'Valor bruto menos despesas confere com o Valor Líquido somado na planilha.';
+    noteEl.style.color = 'var(--muted)';
+  }
+}
+
+function renderAlerts(){
+  const alerts = [];
+  DATA.forEach(r => {
+    const dias = diasAtraso(r);
+    if(isVencido(r) && dias >= 30) alerts.push({ level:'high', text: `<b>${r.cliente}</b> (${r.revenda}) — título ${r.titulo}: vencido há ${dias} dias, ${fmt(pendingValue(r))} em aberto.` });
+    else if(isVencido(r)) alerts.push({ level:'mid', text: `<b>${r.cliente}</b> (${r.revenda}) — título ${r.titulo}: vencido há ${dias} dias.` });
+    if(String(r.vendaCancelada).toLowerCase().includes('sim') && isPendente(r)) alerts.push({ level:'high', text: `<b>${r.cliente}</b> (${r.revenda}) — título ${r.titulo}: venda marcada como cancelada, mas ainda consta ${fmt(pendingValue(r))} pendente. Confirmar se o CR foi ajustado.` });
+  });
+  const seen = new Set();
+  DATA.forEach(r => { const key = r.revenda+'|'+r.titulo; if(seen.has(key)) alerts.push({ level:'high', text:`Título duplicado: <b>${r.titulo}</b> aparece mais de uma vez em ${r.revenda}.` }); seen.add(key); });
+
+  document.getElementById('alertCount').textContent = alerts.length ? `${alerts.length} identificados` : 'nenhum encontrado';
+  document.getElementById('alertsList').innerHTML = alerts.length
+    ? alerts.slice(0,12).map(a => `<div class="alert-item"><span class="alert-dot ${a.level}"></span><span>${a.text}</span></div>`).join('')
+    : `<div class="alert-empty">Nenhuma inconsistência identificada nos dados atuais.</div>`;
+}
+
+function renderTable(){
+  const q = (document.getElementById('searchBox').value || '').toLowerCase();
+  const revendaSel = document.getElementById('revendaFilter').value;
+  const statusSel = document.getElementById('statusFilter').value;
+  const rows = DATA.filter(r => {
+    if(revendaSel && r.revenda !== revendaSel) return false;
+    if(statusSel && statusOf(r) !== statusSel) return false;
+    if(q && !(r.cliente.toLowerCase().includes(q) || String(r.titulo).toLowerCase().includes(q) || r.revenda.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  document.getElementById('tableBody').innerHTML = rows.map(r => {
+    const st = statusOf(r);
+    const badge = st==='vencido' ? `<span class="badge venc">vencido (${diasAtraso(r)}d)</span>` : st==='pendente' ? `<span class="badge pend">pendente</span>` : `<span class="badge pago">recebido</span>`;
+    return `<tr>
+      <td>${r.revenda}</td><td>${r.cliente}</td><td>${r.titulo}</td><td>${r.situacao}</td>
+      <td>${fmt(r.valor)}</td><td>${r.vencimento||'—'}</td><td>${r.pagamento||'—'}</td>
+      <td>${st==='vencido' ? diasAtraso(r) : '—'}</td><td>${fmt(r.valorLiquido)}</td><td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderAll(){
+  populateRevendaFilter();
+  renderKPIs(); renderRanking(); renderAlerts();
+  renderCategoryBreakdown(); renderVariationSummary(); renderTotaisPorRevenda(); renderTotaisCards(); renderDemonstrativo(); renderTable();
+}
+window.addEventListener('load', renderAll);
+
+// ---- Importação (multi-abas, .xls legado e .xlsx) ----
+function showImportModal(html){ document.getElementById('importModalBody').innerHTML = html; document.getElementById('importModal').classList.add('open'); }
+function closeImportModal(){ document.getElementById('importModal').classList.remove('open'); }
+
+function excelDateToStr(v){
+  if(v instanceof Date) return String(v.getDate()).padStart(2,'0')+'/'+String(v.getMonth()+1).padStart(2,'0')+'/'+v.getFullYear();
+  if(typeof v === 'number' && v > 20000 && v < 60000){
+    const d = new Date(Date.UTC(1899,11,30) + v*86400000);
+    return String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear();
+  }
+  return v ? String(v) : '';
+}
+function findCol(headers, mustHave, mustNotHave){
+  mustNotHave = mustNotHave || [];
+  return headers.find(h => {
+    const l = h.toLowerCase();
+    return mustHave.some(w => l.includes(w)) && !mustNotHave.some(w => l.includes(w));
+  });
+}
+function scoreHeaderRow(arr){
+  const lower = arr.map(c => String(c).toLowerCase());
+  let score = 0;
+  ['nome','cliente','título','titulo','valor','vencimento','pagamento','tarifa'].forEach(w => { if(lower.some(c=>c.includes(w))) score++; });
+  return score;
+}
+
+function handleUpload(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      let newData = [];
+      let unmatchedSheets = [];
+
+      wb.SheetNames.forEach(sheetName => {
+        const sheet = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', blankrows:false, raw:true });
+        if(rows.length < 2) return;
+
+        let bestIdx = 0, bestScore = -1;
+        for(let i=0; i<Math.min(rows.length, 12); i++){
+          const s = scoreHeaderRow(rows[i]);
+          if(s > bestScore){ bestScore = s; bestIdx = i; }
+        }
+        if(bestScore < 3){ unmatchedSheets.push(sheetName); return; }
+
+        const headers = rows[bestIdx].map(h => String(h));
+        const nomeKey = findCol(headers, ['nome']);
+        const clienteKey = findCol(headers, ['cliente']);
+        const tituloKey = findCol(headers, ['título','titulo']);
+        const sitKey = findCol(headers, ['sit']);
+        const valorKey = findCol(headers, ['valor'], ['líquido','liquido']);
+        const saldoKey = findCol(headers, ['saldo']);
+        const emissaoKey = findCol(headers, ['emiss']);
+        const vencKey = findCol(headers, ['vencimento']);
+        const pagKey = findCol(headers, ['pagamento']);
+        const tarifaVendaKey = findCol(headers, ['tarifa'], ['envio']);
+        const tarifaEnvioKey = findCol(headers, ['envio']);
+        const despesaKey = findCol(headers, ['despesa']);
+        const freteKey = findCol(headers, ['frete']);
+        const descontoKey = findCol(headers, ['desconto']);
+        const liquidoKey = findCol(headers, ['líquido','liquido']);
+        const canceladaKey = findCol(headers, ['cancelada']);
+        const solucaoKey = findCol(headers, ['solução','solucao']);
+
+        if(!nomeKey || !valorKey || !vencKey){ unmatchedSheets.push(sheetName); return; }
+
+        for(let i=bestIdx+1; i<rows.length; i++){
+          const row = rows[i];
+          const obj = {}; headers.forEach((h,idx) => obj[h] = row[idx]);
+          if(!obj[nomeKey]) continue;
+          newData.push({
+            revenda: sheetName,
+            cliente: String(obj[nomeKey]),
+            codCliente: clienteKey ? String(obj[clienteKey]||'') : '',
+            titulo: tituloKey ? String(obj[tituloKey]||'') : '',
+            situacao: sitKey ? String(obj[sitKey]||'') : '',
+            valor: Number(obj[valorKey])||0,
+            saldo: saldoKey ? (Number(obj[saldoKey])||0) : 0,
+            emissao: emissaoKey ? excelDateToStr(obj[emissaoKey]) : '',
+            vencimento: vencKey ? excelDateToStr(obj[vencKey]) : '',
+            pagamento: pagKey ? excelDateToStr(obj[pagKey]) : '',
+            tarifaVenda: tarifaVendaKey ? (Number(obj[tarifaVendaKey])||0) : 0,
+            tarifaEnvio: tarifaEnvioKey ? (Number(obj[tarifaEnvioKey])||0) : 0,
+            despesaTotal: despesaKey ? (Number(obj[despesaKey])||0) : 0,
+            freteComprador: freteKey ? (Number(obj[freteKey])||0) : 0,
+            descontosBonus: descontoKey ? (Number(obj[descontoKey])||0) : 0,
+            valorLiquido: liquidoKey ? (Number(obj[liquidoKey])||0) : (Number(obj[valorKey])||0),
+            vendaCancelada: canceladaKey ? String(obj[canceladaKey]||'') : '',
+            solucao: solucaoKey ? String(obj[solucaoKey]||'') : ''
+          });
+        }
+      });
+
+      if(newData.length === 0){
+        showImportModal(`
+          <h3>Não consegui reconhecer os títulos nesta planilha</h3>
+          <p>Nenhuma aba do arquivo "${file.name}" tinha as colunas mínimas esperadas (Nome/Cliente, Valor, Vencimento). Os dados de exemplo foram mantidos.</p>
+          ${unmatchedSheets.length ? `<p class="modal-muted">Abas verificadas sem sucesso: ${unmatchedSheets.join(', ')}</p>` : ''}
+          <p class="modal-muted">Colunas mínimas esperadas em cada aba (uma aba por revenda):</p>
+          <div class="modal-cols">${REQUIRED_COLS.join(' · ')}</div>
+          <div class="modal-actions"><button class="btn btn-gold" onclick="closeImportModal()">Entendi</button></div>
+        `);
+        return;
+      }
+
+      DATA = newData;
+      document.getElementById('fileMeta').textContent = `${file.name} — importado agora · ${DATA.length} títulos · ${[...new Set(DATA.map(r=>r.revenda))].length} revendas`;
+      renderAll();
+      let msg = `Planilha "${file.name}" importada: ${DATA.length} títulos em ${[...new Set(DATA.map(r=>r.revenda))].length} revendas identificados. Dashboard e tabela atualizados.`;
+      if(unmatchedSheets.length) msg += ` As abas ${unmatchedSheets.join(', ')} não foram reconhecidas e ficaram de fora.`;
+      pushMessage('ai', msg);
+    }catch(err){
+      showImportModal(`<h3>Erro ao ler o arquivo</h3><p>${err.message}</p><div class="modal-actions"><button class="btn btn-gold" onclick="closeImportModal()">Fechar</button></div>`);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---- Chat com IA (Claude API) ----
+function openChat(){ document.getElementById('chatDrawer').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+function closeChat(){ document.getElementById('chatDrawer').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+function pushMessage(role, text){
+  const body = document.getElementById('chatBody');
+  const div = document.createElement('div'); div.className = 'msg ' + role; div.textContent = text;
+  body.appendChild(div); body.scrollTop = body.scrollHeight; return div;
+}
+function dataAsCSV(){
+  const header = ['Revenda','Cliente','Título','Situação','Valor','Saldo','Emissão','Vencimento','Pagamento','TarifaVenda','TarifaEnvio','TotalDespesas','FreteComprador','DescontosBonus','ValorLiquido','VendaCancelada','DiasAtraso','Status','Solução'].join(';');
+  const lines = DATA.map(r => [r.revenda, r.cliente, r.titulo, r.situacao, r.valor.toFixed(2), r.saldo.toFixed(2), r.emissao, r.vencimento, r.pagamento||'', (r.tarifaVenda||0).toFixed(2), (r.tarifaEnvio||0).toFixed(2), (r.despesaTotal||0).toFixed(2), (r.freteComprador||0).toFixed(2), (r.descontosBonus||0).toFixed(2), r.valorLiquido.toFixed(2), r.vendaCancelada, diasAtraso(r), statusOf(r), (r.solucao||'').replace(/;/g,',')].join(';'));
+  return [header, ...lines].join('\n');
+}
+function askSuggested(el){ document.getElementById('chatInput').value = el.textContent; sendMessage(); }
+
+async function sendMessage(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+  pushMessage('user', text); input.value = '';
+  const loadingEl = pushMessage('ai loading', 'Consultando os dados...');
+
+  const systemPrompt = `Você é o assistente de dados do Meu Dash IA, especializado em contas a receber (CRs) de vendas via Mercado Pago, para uma empresa com várias revendas.
+Responda SOMENTE em português, de forma direta e objetiva. Baseie-se EXCLUSIVAMENTE na tabela abaixo (CSV, separador ';') — nunca invente clientes, revendas ou valores fora dela. "Status" já indica se o título está pendente, vencido ou recebido, e "DiasAtraso" já foi calculado a partir de hoje. Se a pergunta não puder ser respondida com esses dados, diga isso claramente.
+
+TABELA:
+${dataAsCSV()}`;
+
+  try{
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: systemPrompt, messages: [{ role:"user", content:text }] })
+    });
+    const data = await response.json();
+    const reply = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('\n') || 'Não consegui gerar uma resposta.';
+    loadingEl.textContent = reply; loadingEl.classList.remove('loading');
+  }catch(err){
+    loadingEl.textContent = 'Erro ao consultar a IA: ' + err.message; loadingEl.classList.remove('loading');
+  }
+}
+</script>
+</body>
+</html>
