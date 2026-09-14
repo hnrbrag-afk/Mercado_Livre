@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import type { CrTitle, CrTitleInput, ImportRecord } from "@/lib/crs";
 import { SAMPLE_TITLES } from "@/lib/sample-data";
@@ -34,6 +33,8 @@ type ImportRow = {
   title_count: number;
   created_at: string | Date;
 };
+
+const PUBLIC_WORKSPACE_ID = "public-workspace";
 
 function n(v: unknown): number {
   const x = Number(v);
@@ -85,8 +86,7 @@ async function insertTitle(
 }
 
 export const listTitles = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     const sql = await getSql();
     const rows = await sql<TitleRow>`
       select id, revenda, cliente, cod_cliente, titulo, situacao,
@@ -94,14 +94,14 @@ export const listTitles = createServerFn({ method: "GET" })
              tarifa_venda, tarifa_envio, despesa_total, frete_comprador,
              descontos_bonus, valor_liquido, venda_cancelada, solucao
       from titles
-      where user_id = ${context.userId}
+      where user_id = ${PUBLIC_WORKSPACE_ID}
       order by id
     `;
     if (rows.length > 0) return rows.map(mapTitle);
 
     const claimed = await sql<{ user_id: string }>`
       insert into user_state (user_id, seeded)
-      values (${context.userId}, true)
+      values (${PUBLIC_WORKSPACE_ID}, true)
       on conflict (user_id) do nothing
       returning user_id
     `;
@@ -112,19 +112,19 @@ export const listTitles = createServerFn({ method: "GET" })
                tarifa_venda, tarifa_envio, despesa_total, frete_comprador,
                descontos_bonus, valor_liquido, venda_cancelada, solucao
         from titles
-        where user_id = ${context.userId}
+        where user_id = ${PUBLIC_WORKSPACE_ID}
         order by id
       `;
       return again.map(mapTitle);
     }
 
     const imports = await sql<{ c: number }>`
-      select count(*)::int as c from imports where user_id = ${context.userId}
+      select count(*)::int as c from imports where user_id = ${PUBLIC_WORKSPACE_ID}
     `;
     if ((imports[0]?.c ?? 0) > 0) return [];
 
     for (const t of SAMPLE_TITLES) {
-      await insertTitle(sql, context.userId, t);
+      await insertTitle(sql, PUBLIC_WORKSPACE_ID, t);
     }
     const seeded = await sql<TitleRow>`
       select id, revenda, cliente, cod_cliente, titulo, situacao,
@@ -132,20 +132,19 @@ export const listTitles = createServerFn({ method: "GET" })
              tarifa_venda, tarifa_envio, despesa_total, frete_comprador,
              descontos_bonus, valor_liquido, venda_cancelada, solucao
       from titles
-      where user_id = ${context.userId}
+      where user_id = ${PUBLIC_WORKSPACE_ID}
       order by id
     `;
     return seeded.map(mapTitle);
   });
 
 export const listImports = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     const sql = await getSql();
     const rows = await sql<ImportRow>`
       select id, filename, revenda_count, title_count, created_at
       from imports
-      where user_id = ${context.userId}
+      where user_id = ${PUBLIC_WORKSPACE_ID}
       order by id desc
       limit 50
     `;
@@ -192,18 +191,17 @@ const replaceSchema = z.object({
 });
 
 export const replaceTitles = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
   .validator((input: unknown) => replaceSchema.parse(input))
-  .handler(async ({ context, data }) => {
+  .handler(async ({ data }) => {
     const sql = await getSql();
-    await sql`delete from titles where user_id = ${context.userId}`;
+    await sql`delete from titles where user_id = ${PUBLIC_WORKSPACE_ID}`;
     for (const t of data.titles) {
-      await insertTitle(sql, context.userId, t);
+      await insertTitle(sql, PUBLIC_WORKSPACE_ID, t);
     }
     const revendas = new Set(data.titles.map((t) => t.revenda)).size;
     await sql`
       insert into imports (user_id, filename, revenda_count, title_count)
-      values (${context.userId}, ${data.filename}, ${revendas}, ${data.titles.length})
+      values (${PUBLIC_WORKSPACE_ID}, ${data.filename}, ${revendas}, ${data.titles.length})
     `;
     return { count: data.titles.length, revendas };
   });
@@ -214,9 +212,8 @@ const askSchema = z.object({
 });
 
 export const askAssistant = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
   .validator((input: unknown) => askSchema.parse(input))
-  .handler(async ({ context, data }) => {
+  .handler(async ({ data }) => {
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return { ok: false as const, error: "A IA não está disponível neste ambiente." };
@@ -229,7 +226,7 @@ export const askAssistant = createServerFn({ method: "POST" })
              tarifa_venda, tarifa_envio, despesa_total, frete_comprador,
              descontos_bonus, valor_liquido, venda_cancelada, solucao
       from titles
-      where user_id = ${context.userId}
+      where user_id = ${PUBLIC_WORKSPACE_ID}
       order by id
       limit 400
     `;

@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
@@ -25,16 +25,11 @@ import {
 import { ReportDocument } from "@/components/report-document";
 import { HistoricoTable, TitlesTable } from "@/components/titles-table";
 import { Button } from "@/components/ui/button";
-import { RedirectToSignIn } from "@/lib/auth/gates";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { listImports, listTitles, replaceTitles } from "@/lib/server/crs";
 import type { CrTitle } from "@/lib/crs";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: ({ context }) => {
-    if (!context.sessionUser) throw redirect({ to: "/login" });
-  },
   component: Home,
 });
 
@@ -76,15 +71,7 @@ function Splash() {
 }
 
 function Gate() {
-  const { user, isPending } = useCurrentUserState();
-  const [gaveUp, setGaveUp] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setGaveUp(true), 4000);
-    return () => window.clearTimeout(t);
-  }, []);
-  if (user) return <AppShell />;
-  if (isPending && !gaveUp) return <Splash />;
-  return <RedirectToSignIn />;
+  return <AppShell />;
 }
 
 function AppShell() {
