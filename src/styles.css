@@ -464,3 +464,35 @@
 .chat-open {
   right: 0;
 }
+
+.dashboard-kpi-glow {
+  position: absolute;
+  top: -42px;
+  right: -28px;
+  width: 112px;
+  height: 112px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.16), transparent 68%);
+  pointer-events: none;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.dashboard-kpi:hover .dashboard-kpi-glow {
+  transform: scale(1.2);
+  opacity: 0.9;
+}
+
+.dashboard-kpi-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-top: 4px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.08);
+}
+
+.dashboard-panel {
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent 42%);
+  box-shadow: var(--shadow-panel);
+}

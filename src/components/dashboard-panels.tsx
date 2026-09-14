@@ -25,15 +25,19 @@ function Kpi({
   tone?: "up" | "down" | "";
 }) {
   return (
-    <div className="rounded-lg border border-line bg-panel px-5 py-4 shadow-[var(--shadow-panel)]">
-      <div className="mb-2.5 text-xs text-muted">{label}</div>
+    <div className="dashboard-kpi group relative overflow-hidden rounded-xl border border-line bg-panel px-5 py-4 shadow-[var(--shadow-panel)] transition duration-200 hover:-translate-y-0.5 hover:border-gold-soft/70">
+      <div className="dashboard-kpi-glow" aria-hidden="true" />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted">{label}</div>
+        <span className={`dashboard-kpi-dot ${tone === "up" ? "bg-danger" : tone === "down" ? "bg-sage" : "bg-gold"}`} />
+      </div>
       {names ? (
-        <div className="text-[13px] leading-relaxed text-cream">
+        <div className="relative text-[13px] leading-relaxed text-cream">
           {names.join(", ")}
         </div>
       ) : (
         <>
-          <div className="font-mono text-[22px] font-semibold tabular-nums text-cream">{value}</div>
+          <div className="relative font-mono text-[24px] font-semibold tabular-nums tracking-tight text-cream">{value}</div>
           {delta ? (
             <div
               className={`mt-1.5 font-mono text-xs tabular-nums ${
@@ -193,22 +197,22 @@ export function InsightsRow({ titles }: { titles: CrTitle[] }) {
   const totalCancelado = canceladas.reduce((s, r) => s + valorCancelado(r), 0);
 
   return (
-    <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <section className="rounded-lg border border-line bg-panel px-5 py-5">
+    <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <section className="dashboard-panel rounded-xl border border-line bg-panel px-5 py-5 lg:col-span-7">
         <header className="mb-3 flex items-baseline justify-between">
           <h2 className="font-display text-[19px] font-medium text-cream">Ranking — revenda com mais pendências</h2>
-          <span className="text-xs text-muted">Valor pendente</span>
+          <span className="rounded-full border border-line bg-panel-2 px-2 py-1 text-[10px] uppercase tracking-wider text-muted">Valor pendente</span>
         </header>
         <div className="space-y-3">
           {ranking.map((a, i) => (
             <div key={a.revenda} className="flex items-center gap-2.5 text-[12.5px]">
-              <span className="w-4 shrink-0 font-mono text-xs text-muted">{i + 1}</span>
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-panel-2 font-mono text-[10px] text-muted">{String(i + 1).padStart(2, "0")}</span>
               <span className="w-[150px] shrink-0 truncate text-cream" title={a.revenda}>
                 {a.revenda}
               </span>
-              <span className="h-1.5 flex-1 overflow-hidden rounded bg-panel-2">
+              <span className="h-2 flex-1 overflow-hidden rounded-full bg-panel-2">
                 <span
-                  className="block h-full rounded bg-gold"
+                  className="block h-full rounded-full bg-gradient-to-r from-gold-soft to-gold transition-all"
                   style={{ width: `${((a.total / max) * 100).toFixed(0)}%` }}
                 />
               </span>
@@ -220,10 +224,10 @@ export function InsightsRow({ titles }: { titles: CrTitle[] }) {
         </div>
       </section>
 
-      <section className="rounded-lg border border-line bg-panel px-5 py-5">
+      <section className="dashboard-panel rounded-xl border border-line bg-panel px-5 py-5 lg:col-span-5">
         <header className="mb-3 flex items-baseline justify-between">
           <h2 className="font-display text-[19px] font-medium text-cream">Alertas e inconsistências</h2>
-          <span className="text-xs text-muted">
+          <span className="rounded-full border border-danger/30 bg-danger/10 px-2 py-1 text-[10px] uppercase tracking-wider text-danger">
             {alerts.length ? `${alerts.length} identificados` : "nenhum encontrado"}
           </span>
         </header>
@@ -244,7 +248,7 @@ export function InsightsRow({ titles }: { titles: CrTitle[] }) {
         )}
       </section>
 
-      <section className="rounded-lg border border-line bg-panel px-5 py-5">
+      <section className="dashboard-panel rounded-xl border border-line bg-panel px-5 py-5 lg:col-span-5">
         <header className="mb-3 flex items-baseline justify-between">
           <h2 className="font-display text-[19px] font-medium text-cream">Por situação</h2>
           <span className="text-xs text-muted">Quantidade e valor</span>
@@ -261,7 +265,7 @@ export function InsightsRow({ titles }: { titles: CrTitle[] }) {
           ))}
       </section>
 
-      <section className="rounded-lg border border-line bg-panel px-5 py-5">
+      <section className="dashboard-panel rounded-xl border border-line bg-panel px-5 py-5 lg:col-span-7">
         <header className="mb-3 flex items-baseline justify-between">
           <h2 className="font-display text-[19px] font-medium text-cream">Resumo geral</h2>
           <span className="text-xs text-muted">Todos os títulos</span>
